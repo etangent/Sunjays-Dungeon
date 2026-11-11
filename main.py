@@ -1,3 +1,5 @@
+from math import sqrt
+
 import pygame
 import random
 import heapq
@@ -6,11 +8,17 @@ import sys
 # Initialize Pygame
 pygame.init()
 
+
 # Grid and Screen Dimensions
-WIDTH = 800
+WIDTH = 900
 HEIGHT = WIDTH
 GRID_SIZE = 30
 CELL_SIZE = WIDTH // GRID_SIZE
+
+# Setup Display
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Sunjay's Dungeon")
+clock = pygame.time.Clock()
 
 # Colors
 COLOR_BG = (20, 20, 30)
@@ -18,10 +26,15 @@ COLOR_WALL = (50, 50, 70)
 COLOR_PATH = (0, 180, 216)      # Light blue for A* path
 COLOR_PLAYER = (46, 196, 182)    # Turquoise
 
-# Setup Display
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Sunjay's Dungeon")
-clock = pygame.time.Clock()
+GHOST_IMAGE = pygame.image.load("./assets/ghost.jpg").convert_alpha()
+GHOST_IMAGE = pygame.transform.scale(GHOST_IMAGE, (CELL_SIZE - 8, CELL_SIZE - 8))
+
+PLAYER_IMAGE = pygame.image.load("./assets/player.jpg").convert_alpha()
+PLAYER_IMAGE = pygame.transform.scale(PLAYER_IMAGE, (CELL_SIZE - 8, CELL_SIZE - 8))
+
+BOSS_IMAGE = pygame.image.load("./assets/boss.jpg").convert_alpha()
+BOSS_IMAGE = pygame.transform.scale(BOSS_IMAGE, (3* CELL_SIZE - 8, 3* CELL_SIZE - 8))
+BOSS_IMAGE.set_alpha(128)
 
 # --- MAZE GENERATION (Randomized DFS + Extra Openings for Loops) ---
 def generate_maze(size, loop_density):
@@ -66,6 +79,15 @@ class Player:
         self.pos = list(start_pos)
         self.move_cooldown = move_cooldown
         self.color = color
+        self.light_level = 4
+
+    def draw(self, screen):
+        p_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4, self.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
+        screen.blit(PLAYER_IMAGE, p_rect)
+
+    def light_value(self, cell_pos):
+        distance = sqrt((cell_pos[0] - self.pos[0])**2 + (cell_pos[1] - self.pos[1])**2)
+        return max(0, 1  - round(distance) / self.light_level)
 
 class Ghost:
     def __init__(self, start_pos, move_cooldown, color):
@@ -124,9 +146,10 @@ class Ghost:
         label = font.render(self.state, True, (255, 255, 255))
         screen.blit(label, (self.pos[0] * CELL_SIZE + 2, self.pos[1] * CELL_SIZE - 10))
 
-    def draw(self, screen):        
+    def draw(self, screen, opacity=1):
         g_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4, self.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
-        pygame.draw.rect(screen, self.color, g_rect, border_radius=4)
+        GHOST_IMAGE.set_alpha(opacity * 255)
+        screen.blit(GHOST_IMAGE, g_rect)
 
     def heuristic(self, a, b):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
@@ -242,9 +265,10 @@ class Boss:
             self.update_path(maze, player_pos)
             self.last_move_time = current_time
 
-    def draw(self, screen):
-        b_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4, self.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
-        pygame.draw.rect(screen, self.color, b_rect, border_radius=4)
+    def draw(self, screen, opacity = 1):
+        BOSS_IMAGE.set_alpha(opacity * 255)
+        b_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4 - CELL_SIZE // 2, self.pos[1] * CELL_SIZE + 4 - CELL_SIZE // 2, 3 * CELL_SIZE - 8, 3 * CELL_SIZE - 8)
+        screen.blit(BOSS_IMAGE, b_rect)
 
     def draw_path(self, screen):
         for step in self.path:
@@ -256,7 +280,7 @@ class Boss:
     def draw_label(self, screen):
         font = pygame.font.SysFont(None, CELL_SIZE // 2)
         label = font.render(str(round(self.avg_accuracy[0] / self.avg_accuracy[1] * 100)) + "%", True, (255, 255, 255))
-        screen.blit(label, (self.pos[0] * CELL_SIZE + 5, self.pos[1] * CELL_SIZE - 10))
+        screen.blit(label, (self.pos[0] * CELL_SIZE + 20, self.pos[1] * CELL_SIZE - 20))
 
     def heuristic(self, a, b):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
@@ -305,11 +329,11 @@ player = Player(start_pos=[GRID_SIZE - 4, GRID_SIZE - 4], move_cooldown=150, col
 maze[player.pos[1]][player.pos[0]].terrain_type = "path"
 
 ghosts = [
-    Ghost(start_pos=(1, 1), move_cooldown=220, color=(231, 76, 60)),
-    Ghost(start_pos=(1, 3), move_cooldown=220, color=(243, 156, 18))
+    Ghost(start_pos=(1, 1), move_cooldown=300, color=(231, 76, 60)),
+    Ghost(start_pos=(1, 3), move_cooldown=300, color=(243, 156, 18))
 ]
 
-boss = Boss(start_pos=(GRID_SIZE - 2, 1), move_cooldown=300, color=(155, 89, 182))
+boss = Boss(start_pos=(GRID_SIZE - 2, 1), move_cooldown=500, color=(155, 89, 182))
 
 for ghost in ghosts:
     maze[ghost.pos[1]][ghost.pos[0]].terrain_type = "path"
@@ -383,23 +407,34 @@ while running:
     
     for row in range(GRID_SIZE):
         for col in range(GRID_SIZE):
-            rect = pygame.Rect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+            pos = (col * CELL_SIZE, row * CELL_SIZE)
+            rect = pygame.Rect(pos, (CELL_SIZE, CELL_SIZE))
             if maze[row][col].terrain_type == "wall":
-                pygame.draw.rect(screen, COLOR_WALL, rect)
+                color = COLOR_WALL
+                if not debug:
+                    light = player.light_value((col, row))
+                    color = (COLOR_BG[0] * (1 - light) + COLOR_WALL[0] * light, 
+                            COLOR_BG[1] * (1 - light) + COLOR_WALL[1] * light, 
+                            COLOR_BG[2] * (1 - light) + COLOR_WALL[2] * light)
+                pygame.draw.rect(screen, color, rect)
    
     for ghost in ghosts:
-        ghost.draw(screen)
-        if debug:
+        if not debug:
+            ghost.draw(screen, player.light_value(ghost.pos))
+        else:
             ghost.draw_path(screen)
             ghost.draw_label(screen)
+            ghost.draw(screen)
 
-    if debug:
+
+    if not debug:
+        boss.draw(screen, player.light_value(boss.pos))
+    else:
         boss.draw_path(screen)
         boss.draw_label(screen)
-    boss.draw(screen)
+        boss.draw(screen)
 
-    p_rect = pygame.Rect(player.pos[0] * CELL_SIZE + 4, player.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
-    pygame.draw.rect(screen, COLOR_PLAYER, p_rect, border_radius=4)
+    player.draw(screen)
 
     pygame.display.flip()
     clock.tick(30)
