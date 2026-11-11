@@ -9,7 +9,7 @@ pygame.init()
 # Grid and Screen Dimensions
 WIDTH = 800
 HEIGHT = WIDTH
-GRID_SIZE = 50
+GRID_SIZE = 30
 CELL_SIZE = WIDTH // GRID_SIZE
 
 # Colors
@@ -24,7 +24,7 @@ pygame.display.set_caption("Sunjay's Dungeon")
 clock = pygame.time.Clock()
 
 # --- MAZE GENERATION (Randomized DFS + Extra Openings for Loops) ---
-def generate_maze(size, loop_density=0.25):
+def generate_maze(size, loop_density):
     maze = [[Cell(x, y) for x in range(size)] for y in range(size)]
     stack = [(1, 1)]
     maze[1][1].terrain_type = "path"
@@ -74,12 +74,33 @@ class Ghost:
         self.color = color
         self.last_move_time = pygame.time.get_ticks()
         self.path = []
+        self.state = "patrol"
+        self.tracker = [[1 for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
 
-    def update_path(self, maze, player_pos, companion_pos=None):
+    def update_state(self, player_pos):
+        if self.state == "patrol":
+            if self.heuristic(player_pos, tuple(self.pos)) < 7:
+                self.state = "chase"
+        elif self.state == "chase":
+            if self.heuristic(player_pos, tuple(self.pos)) >= 10:
+                self.state = "patrol"
+                self.path = []
+
+        if self.state == "chase":
+            self.move(pygame.time.get_ticks(), maze, player_pos)
+        else:
+            if pygame.time.get_ticks() - self.last_move_time > self.move_cooldown:
+                neighbours = [(self.pos[0] + dx, self.pos[1] + dy) for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)] if 0 <= self.pos[0] + dx < GRID_SIZE and 0 <= self.pos[1] + dy < GRID_SIZE and maze[self.pos[1] + dy][self.pos[0] + dx].terrain_type == "path"]
+                self.pos = list(random.choices(neighbours, weights=[1 / self.tracker[y][x]**10 for x, y in neighbours])[0]) if neighbours else list(self.pos)
+                self.tracker[self.pos[1]][self.pos[0]] += 1
+                self.last_move_time = pygame.time.get_ticks()
+
+    def update_path(self, maze, player_pos):
         self.path = self.get_astar_path(maze, tuple(self.pos), tuple(player_pos))
 
-    def move(self, current_time, maze, player_pos, companion_pos=None):
+    def move(self, current_time, maze, player_pos):
         if current_time - self.last_move_time > self.move_cooldown:
+            self.update_path(maze, player_pos)
             if len(self.path) > 1:
                 if tuple(self.pos) in self.path:
                     idx = self.path.index(tuple(self.pos))
@@ -87,8 +108,8 @@ class Ghost:
                         self.pos = list(self.path[idx + 1])
                 else:
                     self.pos = list(self.path[0])
-            
-            self.update_path(maze, player_pos, companion_pos)
+
+            self.update_path(maze, player_pos)
             self.last_move_time = current_time
 
     def draw_path(self, screen):
@@ -98,11 +119,15 @@ class Ghost:
                 center_y = step[1] * CELL_SIZE + CELL_SIZE // 2
                 pygame.draw.circle(screen, self.color, (center_x, center_y), CELL_SIZE // 12)
 
+    def draw_label(self, screen):
+        font = pygame.font.SysFont(None, CELL_SIZE // 2)
+        label = font.render(self.state, True, (255, 255, 255))
+        screen.blit(label, (self.pos[0] * CELL_SIZE + 2, self.pos[1] * CELL_SIZE - 10))
+
     def draw(self, screen):        
         g_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4, self.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
         pygame.draw.rect(screen, self.color, g_rect, border_radius=4)
 
-    # --- A* PATHFINDING ALGORITHM ---
     def heuristic(self, a, b):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
@@ -150,12 +175,62 @@ class Boss:
         self.color = color
         self.last_move_time = pygame.time.get_ticks()
         self.path = []
+        self.transition = [
+            [10, 2, 5, 5], 
+            [2, 10, 5, 5], 
+            [5, 5, 10, 2], 
+            [5, 5, 2, 10]]
+        self.avg_accuracy = [1, 1]
+        self.recency_bias = .8
 
-    def update_path(self, maze, player_pos):
-        self.path = self.get_astar_path(maze, tuple(self.pos), tuple(player_pos))
+    def update_transition(self, last_player_move, current_player_move):
+        trans_dict = {"up": 0, "down": 1, "left": 2, "right": 3}
+        self.avg_accuracy[0] *= self.recency_bias
+        self.avg_accuracy[1] *= self.recency_bias
+        if (random.choices([0, 1, 2, 3], weights=self.transition[trans_dict[last_player_move]])[0] == trans_dict[current_player_move]):
+            self.avg_accuracy[0] += 1
+        self.avg_accuracy[1] += 1
+        last_move_idx = trans_dict[last_player_move]
+        current_move_idx = trans_dict[current_player_move]
+        for i in range(4):
+            self.transition[last_move_idx][i] *= self.recency_bias
+        self.transition[last_move_idx][current_move_idx] += 1
+
+    def ambush(self, current_time, maze, player_pos, last_player_move):
+        trans_dict = {"up": 0, "down": 1, "left": 2, "right": 3}
+        move_dict = {0: (0, -1), 1: (0, 1), 2: (-1, 0), 3: (1, 0)}
+        next_move = trans_dict[last_player_move]
+        target = player_pos
+        if self.heuristic(tuple(self.pos), tuple(player_pos)) < 5:
+            lookahead = 0
+        elif self.heuristic(tuple(self.pos), tuple(player_pos)) < 10:
+            lookahead = 2
+        elif self.heuristic(tuple(self.pos), tuple(player_pos)) < 20:
+            lookahead = 5
+        else:
+            lookahead = 10
+        for i in range(lookahead):
+            curr_row = self.transition[next_move]
+            filtered = []
+            for i in range(4):
+                dx, dy = move_dict[i]
+                new_x = target[0] + dx
+                new_y = target[1] + dy
+                if 0 <= new_x < GRID_SIZE and 0 <= new_y < GRID_SIZE and maze[new_y][new_x].terrain_type == "path":
+                    filtered.append((curr_row[i], (new_x, new_y)))
+                else:
+                    filtered.append((0, (new_x, new_y)))
+            if filtered:
+                next_move = random.choices([i for i in range(4)], weights=[f[0] for f in filtered])[0]
+                target = filtered[next_move][1]
+        self.move(current_time, maze, target)
+
+    def update_path(self, maze, target_pos):
+        self.path = self.get_astar_path(maze, tuple(self.pos), tuple(target_pos))
 
     def move(self, current_time, maze, player_pos):
         if current_time - self.last_move_time > self.move_cooldown:
+            self.update_path(maze, player_pos)
             if len(self.path) > 1:
                 if tuple(self.pos) in self.path:
                     idx = self.path.index(tuple(self.pos))
@@ -163,7 +238,7 @@ class Boss:
                         self.pos = list(self.path[idx + 1])
                 else:
                     self.pos = list(self.path[0])
-            
+
             self.update_path(maze, player_pos)
             self.last_move_time = current_time
 
@@ -177,6 +252,11 @@ class Boss:
                 center_x = step[0] * CELL_SIZE + CELL_SIZE // 2
                 center_y = step[1] * CELL_SIZE + CELL_SIZE // 2
                 pygame.draw.circle(screen, self.color, (center_x, center_y), CELL_SIZE // 12)
+
+    def draw_label(self, screen):
+        font = pygame.font.SysFont(None, CELL_SIZE // 2)
+        label = font.render(str(round(self.avg_accuracy[0] / self.avg_accuracy[1] * 100)) + "%", True, (255, 255, 255))
+        screen.blit(label, (self.pos[0] * CELL_SIZE + 5, self.pos[1] * CELL_SIZE - 10))
 
     def heuristic(self, a, b):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
@@ -219,7 +299,7 @@ class Boss:
         return path
 
 
-maze = generate_maze(GRID_SIZE, loop_density=0.25)
+maze = generate_maze(GRID_SIZE, .25)
 
 player = Player(start_pos=[GRID_SIZE - 4, GRID_SIZE - 4], move_cooldown=150, color=(52, 152, 219))
 maze[player.pos[1]][player.pos[0]].terrain_type = "path"
@@ -234,15 +314,13 @@ boss = Boss(start_pos=(GRID_SIZE - 2, 1), move_cooldown=300, color=(155, 89, 182
 for ghost in ghosts:
     maze[ghost.pos[1]][ghost.pos[0]].terrain_type = "path"
 
-ghosts[0].update_path(maze, player.pos)
-ghosts[1].update_path(maze, player.pos, ghosts[0].pos)
-boss.update_path(maze, player.pos)
-
 PLAYER_COOLDOWN = 150
-last_player_move = pygame.time.get_ticks()
+last_player_move_time = pygame.time.get_ticks()
 
 # --- MAIN GAME LOOP ---
+debug = False
 running = True
+last_player_move = "up"
 while running:
     current_time = pygame.time.get_ticks()
     
@@ -251,6 +329,11 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                running = False
+            if event.key == pygame.K_F1:
+                debug = not debug
             
     keys = pygame.key.get_pressed()
     if keys[pygame.K_UP] or keys[pygame.K_w]:
@@ -263,25 +346,37 @@ while running:
         dx = 1
 
     # 2. Update Positions
-    if (dx != 0 or dy != 0) and (current_time - last_player_move > PLAYER_COOLDOWN):
+    if (dx != 0 or dy != 0) and (current_time - last_player_move_time > PLAYER_COOLDOWN):
         new_px = player.pos[0] + dx
         new_py = player.pos[1] + dy
+
+        if dx == 1:
+            new_last_player_move = "right"
+        elif dx == -1:
+            new_last_player_move = "left"
+        elif dy == 1:
+            new_last_player_move = "down"
+        elif dy == -1:
+            new_last_player_move = "up"
+
+        boss.update_transition(last_player_move, new_last_player_move)
+        last_player_move = new_last_player_move
         
         if 0 <= new_px < GRID_SIZE and 0 <= new_py < GRID_SIZE and maze[new_py][new_px].terrain_type == "path":
             player.pos = [new_px, new_py]
-            last_player_move = current_time
-            
-            ghosts[0].update_path(maze, player.pos)
-            ghosts[1].update_path(maze, player.pos, ghosts[0].pos)
-            boss.update_path(maze, player.pos)
-    ghosts[0].move(current_time, maze, player.pos)
-    ghosts[1].move(current_time, maze, player.pos, ghosts[0].pos)
-    boss.move(current_time, maze, player.pos)
+            last_player_move_time = current_time
+
+    for ghost in ghosts:
+        ghost.update_state(player.pos)
+    boss.ambush(current_time, maze, player.pos, last_player_move)
 
     for ghost in ghosts:
         if player.pos == ghost.pos:
-            print("Game Over! You got cornered by the pincer AI.")
+            print("Game Over! You got cornered by the AI.")
             running = False
+    if player.pos == boss.pos:
+        print("Game Over! You got cornered by the Boss.")
+        running = False
 
     # 3. Rendering Layers
     screen.fill(COLOR_BG)
@@ -294,9 +389,13 @@ while running:
    
     for ghost in ghosts:
         ghost.draw(screen)
-        ghost.draw_path(screen)
+        if debug:
+            ghost.draw_path(screen)
+            ghost.draw_label(screen)
 
-    boss.draw_path(screen)
+    if debug:
+        boss.draw_path(screen)
+        boss.draw_label(screen)
     boss.draw(screen)
 
     p_rect = pygame.Rect(player.pos[0] * CELL_SIZE + 4, player.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
