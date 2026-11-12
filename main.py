@@ -401,10 +401,14 @@ while running:
             else:
                 avg_move_time = (0, 0)
 
+            if (current_time - player.last_trip < 5000):
+                trip_chance = 0
+
             last_player_move_time = current_time
 
     if trip_chance > .1 and random.random() < trip_chance:
         player.last_trip = current_time
+        avg_move_time = (0, 0)
 
     for ghost in ghosts:
         if player.pos == ghost.pos:
