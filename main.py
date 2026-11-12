@@ -32,6 +32,10 @@ GHOST_IMAGE = pygame.transform.scale(GHOST_IMAGE, (CELL_SIZE - 8, CELL_SIZE - 8)
 PLAYER_IMAGE = pygame.image.load("./assets/player.jpg").convert_alpha()
 PLAYER_IMAGE = pygame.transform.scale(PLAYER_IMAGE, (CELL_SIZE - 8, CELL_SIZE - 8))
 
+BLUEBANNER_IMAGE = pygame.image.load("./assets/blue banner-100.jpg").convert_alpha()
+BLUEBANNER_IMAGE = pygame.transform.scale(BLUEBANNER_IMAGE, (CELL_SIZE - 8, CELL_SIZE - 8))
+
+
 BOSS_IMAGE = pygame.image.load("./assets/boss.jpg").convert_alpha()
 BOSS_IMAGE = pygame.transform.scale(BOSS_IMAGE, (3* CELL_SIZE - 8, 3* CELL_SIZE - 8))
 BOSS_IMAGE.set_alpha(128)
@@ -73,6 +77,24 @@ class Cell:
         self.x = x
         self.y = y
         self.terrain_type = terrain_type
+
+class bluebanner:
+    def __init__(self, maze, occupied_positions):
+        self.pos = [1, 1]
+        self.spawn(maze, occupied_positions)
+
+    def draw(self, screen, opacity=1):
+        b_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4, self.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
+        BLUEBANNER_IMAGE.set_alpha(opacity * 255)
+        screen.blit(BLUEBANNER_IMAGE, b_rect)
+
+    def spawn(self, maze, occupied_positions):
+        while True:
+            x = random.randint(1, GRID_SIZE - 2)
+            y = random.randint(1, GRID_SIZE - 2)
+            if maze[y][x].terrain_type == "path" and (x, y) not in occupied_positions:
+                self.pos = [x, y]
+                break
 
 class Player:
     def __init__(self, start_pos, move_cooldown, color):
@@ -343,6 +365,10 @@ for ghost in ghosts:
 PLAYER_COOLDOWN = 150
 last_player_move_time = pygame.time.get_ticks()
 
+occupied = [player.pos, boss.pos] + [g.pos for g in ghosts]
+banner = bluebanner(maze, occupied)
+banners_collected = 0
+
 # --- MAIN GAME LOOP ---
 debug = False
 running = True
@@ -404,6 +430,12 @@ while running:
         ghost.update_state(player.pos)
     boss.ambush(current_time, maze, player.pos, last_player_move)
 
+    if (player.pos == banner.pos):
+        banners_collected += 1
+        occupied = [player.pos, boss.pos] + [g.pos for g in ghosts]
+        banner.spawn(maze, occupied)
+        print(f"REGIONAL WINS: {banners_collected}")
+
     # 3. Rendering Layers
     screen.fill(COLOR_BG)
     
@@ -431,10 +463,16 @@ while running:
 
     if not debug:
         boss.draw(screen, player.light_value(boss.pos))
+        banner.draw(screen, player.light_value(banner.pos))
     else:
         boss.draw_path(screen)
         boss.draw_label(screen)
         boss.draw(screen)
+        banner.draw(screen)
+
+    if banners_collected == 3:
+        print("Congratulations! You've collected 3 blue banners and won the game!")
+        running = False
 
     player.draw(screen)
 
