@@ -347,7 +347,7 @@ PLAYER_COOLDOWN = 150
 last_player_move_time = pygame.time.get_ticks()
 
 # --- MAIN GAME LOOP ---
-avg_move_time = 0
+avg_move_time = (0, 0)
 debug = False
 running = True
 last_player_move = "up"
@@ -394,16 +394,16 @@ while running:
         if 0 <= new_px < GRID_SIZE and 0 <= new_py < GRID_SIZE and maze[new_py][new_px].terrain_type == "path":
             player.pos = [new_px, new_py]
 
-            smoothing = .1
             time_diff = current_time - last_player_move_time
-            if time_diff < 5000:
-                # EMA
-                avg_move_time = (smoothing * time_diff) + (avg_move_time * (1 - smoothing))
-                trip_chance = min(.25, (time_diff - avg_move_time) / 1000 / (time_diff / 1000))
+            if time_diff < 1500:
+                avg_move_time = (avg_move_time[0] + time_diff, avg_move_time[1] + 1)
+                trip_chance = min(.25, .25 * abs(time_diff - (avg_move_time[0]/avg_move_time[1])) / 500 / (time_diff / 500))
+            else:
+                avg_move_time = (0, 0)
 
             last_player_move_time = current_time
 
-    if random.random() < trip_chance:
+    if trip_chance > .1 and random.random() < trip_chance:
         player.last_trip = current_time
 
     for ghost in ghosts:
