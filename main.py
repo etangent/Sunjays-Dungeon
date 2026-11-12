@@ -75,11 +75,12 @@ class Cell:
         self.terrain_type = terrain_type
 
 class Player:
-    def __init__(self, start_pos, move_cooldown, color):
+    def __init__(self, start_pos, move_cooldown, color, last_trip = 0):
         self.pos = list(start_pos)
         self.move_cooldown = move_cooldown
         self.color = color
         self.light_level = 4
+        self.last_trip = last_trip
 
     def draw(self, screen):
         p_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4, self.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
@@ -346,6 +347,7 @@ PLAYER_COOLDOWN = 150
 last_player_move_time = pygame.time.get_ticks()
 
 # --- MAIN GAME LOOP ---
+avg_move_time = 0
 debug = False
 running = True
 last_player_move = "up"
@@ -362,19 +364,18 @@ while running:
                 running = False
             if event.key == pygame.K_F1:
                 debug = not debug
-            
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_UP] or keys[pygame.K_w]:
-        dy = -1
-    elif keys[pygame.K_DOWN] or keys[pygame.K_s]:
-        dy = 1
-    elif keys[pygame.K_LEFT] or keys[pygame.K_a]:
-        dx = -1
-    elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-        dx = 1
+            if event.key == pygame.K_UP or event.key == pygame.K_w:
+                dy = -1
+            elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                dy = 1
+            elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
+                dx = -1
+            elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                dx = 1
 
+    trip_chance = 0
     # 2. Update Positions
-    if (dx != 0 or dy != 0) and (current_time - last_player_move_time > PLAYER_COOLDOWN):
+    if (dx != 0 or dy != 0) and (current_time - last_player_move_time > PLAYER_COOLDOWN) and (current_time - player.last_trip > 1000):
         new_px = player.pos[0] + dx
         new_py = player.pos[1] + dy
 
@@ -392,7 +393,18 @@ while running:
         
         if 0 <= new_px < GRID_SIZE and 0 <= new_py < GRID_SIZE and maze[new_py][new_px].terrain_type == "path":
             player.pos = [new_px, new_py]
+
+            smoothing = .1
+            time_diff = current_time - last_player_move_time
+            if time_diff < 5000:
+                # EMA
+                avg_move_time = (smoothing * time_diff) + (avg_move_time * (1 - smoothing))
+                trip_chance = min(.25, (time_diff - avg_move_time) / 1000 / (time_diff / 1000))
+
             last_player_move_time = current_time
+
+    if random.random() < trip_chance:
+        player.last_trip = current_time
 
     for ghost in ghosts:
         if player.pos == ghost.pos:
@@ -442,6 +454,10 @@ while running:
         boss.draw(screen)
 
     player.draw(screen)
+    if (current_time > 1000 and current_time - player.last_trip < 1000):
+        font = pygame.font.SysFont(None, CELL_SIZE)
+        label = font.render("TRIPPED!", True, (255, 0, 0))
+        screen.blit(label, (player.pos[0] * CELL_SIZE - 25, player.pos[1] * CELL_SIZE + 5))
 
     pygame.display.flip()
     clock.tick(30)
