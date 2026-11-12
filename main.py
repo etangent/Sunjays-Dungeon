@@ -264,6 +264,8 @@ class Boss:
 
             self.update_path(maze, player_pos)
             self.last_move_time = current_time
+            if self.heuristic(tuple(player_pos), tuple(self.pos)) == 0:
+                return
             self.move_cooldown = min(500, 500 / (.1 * self.heuristic(tuple(player_pos), tuple(self.pos))))
 
     def draw(self, screen, opacity = 1):
@@ -399,6 +401,9 @@ while running:
     if player.pos == boss.pos:
         print("Game Over! You got cornered by the Boss.")
         running = False
+
+    if not running:
+        break
 
     for ghost in ghosts:
         ghost.update_state(player.pos)
