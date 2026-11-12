@@ -97,11 +97,12 @@ class bluebanner:
                 break
 
 class Player:
-    def __init__(self, start_pos, move_cooldown, color):
+    def __init__(self, start_pos, move_cooldown, color, last_trip = 0):
         self.pos = list(start_pos)
         self.move_cooldown = move_cooldown
         self.color = color
         self.light_level = 4
+        self.last_trip = last_trip
 
     def draw(self, screen):
         p_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4, self.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
@@ -286,6 +287,8 @@ class Boss:
 
             self.update_path(maze, player_pos)
             self.last_move_time = current_time
+            if self.heuristic(tuple(player_pos), tuple(self.pos)) == 0:
+                return
             self.move_cooldown = min(500, 500 / (.1 * self.heuristic(tuple(player_pos), tuple(self.pos))))
 
     def draw(self, screen, opacity = 1):
@@ -370,6 +373,7 @@ banner = bluebanner(maze, occupied)
 banners_collected = 0
 
 # --- MAIN GAME LOOP ---
+avg_move_time = (0, 0)
 debug = False
 running = True
 last_player_move = "up"
@@ -386,19 +390,18 @@ while running:
                 running = False
             if event.key == pygame.K_F1:
                 debug = not debug
-            
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_UP] or keys[pygame.K_w]:
-        dy = -1
-    elif keys[pygame.K_DOWN] or keys[pygame.K_s]:
-        dy = 1
-    elif keys[pygame.K_LEFT] or keys[pygame.K_a]:
-        dx = -1
-    elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-        dx = 1
+            if event.key == pygame.K_UP or event.key == pygame.K_w:
+                dy = -1
+            elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                dy = 1
+            elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
+                dx = -1
+            elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                dx = 1
 
+    trip_chance = 0
     # 2. Update Positions
-    if (dx != 0 or dy != 0) and (current_time - last_player_move_time > PLAYER_COOLDOWN):
+    if (dx != 0 or dy != 0) and (current_time - last_player_move_time > PLAYER_COOLDOWN) and (current_time - player.last_trip > 1000):
         new_px = player.pos[0] + dx
         new_py = player.pos[1] + dy
 
@@ -416,7 +419,18 @@ while running:
         
         if 0 <= new_px < GRID_SIZE and 0 <= new_py < GRID_SIZE and maze[new_py][new_px].terrain_type == "path":
             player.pos = [new_px, new_py]
+
+            time_diff = current_time - last_player_move_time
+            if time_diff < 1500:
+                avg_move_time = (avg_move_time[0] + time_diff, avg_move_time[1] + 1)
+                trip_chance = min(.25, .25 * abs(time_diff - (avg_move_time[0]/avg_move_time[1])) / 500 / (time_diff / 500))
+            else:
+                avg_move_time = (0, 0)
+
             last_player_move_time = current_time
+
+    if trip_chance > .1 and random.random() < trip_chance:
+        player.last_trip = current_time
 
     for ghost in ghosts:
         if player.pos == ghost.pos:
@@ -425,6 +439,9 @@ while running:
     if player.pos == boss.pos:
         print("Game Over! You got cornered by the Boss.")
         running = False
+
+    if not running:
+        break
 
     for ghost in ghosts:
         ghost.update_state(player.pos)
@@ -475,6 +492,10 @@ while running:
         running = False
 
     player.draw(screen)
+    if (current_time > 1000 and current_time - player.last_trip < 1000):
+        font = pygame.font.SysFont(None, CELL_SIZE)
+        label = font.render("TRIPPED!", True, (255, 0, 0))
+        screen.blit(label, (player.pos[0] * CELL_SIZE - 25, player.pos[1] * CELL_SIZE + 5))
 
     pygame.display.flip()
     clock.tick(30)
