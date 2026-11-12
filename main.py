@@ -199,10 +199,10 @@ class Boss:
         self.last_move_time = pygame.time.get_ticks()
         self.path = []
         self.transition = [
-            [10, 2, 5, 5], 
-            [2, 10, 5, 5], 
-            [5, 5, 10, 2], 
-            [5, 5, 2, 10]]
+            [100, .1, 5, 5], 
+            [0.1, 100, 5, 5], 
+            [5, 5, 100, .1], 
+            [5, 5, .1, 100]]
         self.avg_accuracy = [1, 1]
         self.recency_bias = .8
 
@@ -264,6 +264,7 @@ class Boss:
 
             self.update_path(maze, player_pos)
             self.last_move_time = current_time
+            self.move_cooldown = min(500, 500 / (.1 * self.heuristic(tuple(player_pos), tuple(self.pos))))
 
     def draw(self, screen, opacity = 1):
         BOSS_IMAGE.set_alpha(opacity * 255)
@@ -330,10 +331,11 @@ maze[player.pos[1]][player.pos[0]].terrain_type = "path"
 
 ghosts = [
     Ghost(start_pos=(1, 1), move_cooldown=300, color=(231, 76, 60)),
-    Ghost(start_pos=(1, 3), move_cooldown=300, color=(243, 156, 18))
+    Ghost(start_pos=(1, GRID_SIZE - 3), move_cooldown=300, color=(243, 156, 18)),
+    Ghost(start_pos=(GRID_SIZE - 3, 1), move_cooldown=300, color=(243, 200, 20))
 ]
 
-boss = Boss(start_pos=(GRID_SIZE - 2, 1), move_cooldown=500, color=(155, 89, 182))
+boss = Boss(start_pos=(GRID_SIZE // 2, GRID_SIZE // 2), move_cooldown=500, color=(155, 89, 182))
 
 for ghost in ghosts:
     maze[ghost.pos[1]][ghost.pos[0]].terrain_type = "path"
@@ -391,16 +393,16 @@ while running:
             last_player_move_time = current_time
 
     for ghost in ghosts:
-        ghost.update_state(player.pos)
-    boss.ambush(current_time, maze, player.pos, last_player_move)
-
-    for ghost in ghosts:
         if player.pos == ghost.pos:
             print("Game Over! You got cornered by the AI.")
             running = False
     if player.pos == boss.pos:
         print("Game Over! You got cornered by the Boss.")
         running = False
+
+    for ghost in ghosts:
+        ghost.update_state(player.pos)
+    boss.ambush(current_time, maze, player.pos, last_player_move)
 
     # 3. Rendering Layers
     screen.fill(COLOR_BG)
