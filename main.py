@@ -12,11 +12,13 @@ pygame.init()
 # Grid and Screen Dimensions
 WIDTH = 900
 HEIGHT = WIDTH
+SCALE = 0.7
 GRID_SIZE = 30
 CELL_SIZE = WIDTH // GRID_SIZE
 
 # Setup Display
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+_screen = pygame.display.set_mode((int(WIDTH*SCALE), int(HEIGHT*SCALE)), pygame.SCALED)
+screen = pygame.Surface((WIDTH, HEIGHT))
 pygame.display.set_caption("Sunjay's Dungeon")
 clock = pygame.time.Clock()
 
@@ -501,6 +503,7 @@ while running:
         label = font.render("TRIPPED!", True, (255, 0, 0))
         screen.blit(label, (player.pos[0] * CELL_SIZE - 25, player.pos[1] * CELL_SIZE + 5))
 
+    _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (0, 0))
     pygame.display.flip()
     clock.tick(30)
 
