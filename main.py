@@ -22,25 +22,25 @@ screen = pygame.Surface((WIDTH, HEIGHT))
 pygame.display.set_caption("Sunjay's Dungeon")
 clock = pygame.time.Clock()
 
-# Colors
-COLOR_BG = (20, 20, 30)
-COLOR_WALL = (50, 50, 70)
-COLOR_PATH = (0, 180, 216)      # Light blue for A* path
-COLOR_PLAYER = (46, 196, 182)    # Turquoise
+class Color:
+    BG = (20, 20, 30)
+    WALL = (50, 50, 70)
+    PATH = (0, 180, 216)      # Light blue for A* path
+    PLAYER = (46, 196, 182)    # Turquoise
 
-GHOST_IMAGE = pygame.image.load("./assets/ghost.jpg").convert_alpha()
-GHOST_IMAGE = pygame.transform.scale(GHOST_IMAGE, (CELL_SIZE - 8, CELL_SIZE - 8))
+class Image:
+    GHOST = pygame.image.load("./assets/ghost.jpg").convert_alpha()
+    GHOST = pygame.transform.scale(GHOST, (CELL_SIZE - 8, CELL_SIZE - 8))
 
-PLAYER_IMAGE = pygame.image.load("./assets/player.jpg").convert_alpha()
-PLAYER_IMAGE = pygame.transform.scale(PLAYER_IMAGE, (CELL_SIZE - 8, CELL_SIZE - 8))
+    PLAYER = pygame.image.load("./assets/player.jpg").convert_alpha()
+    PLAYER = pygame.transform.scale(PLAYER, (CELL_SIZE - 8, CELL_SIZE - 8))
 
-BLUEBANNER_IMAGE = pygame.image.load("./assets/blue banner-100.jpg").convert_alpha()
-BLUEBANNER_IMAGE = pygame.transform.scale(BLUEBANNER_IMAGE, (CELL_SIZE - 8, CELL_SIZE - 8))
-
-
-BOSS_IMAGE = pygame.image.load("./assets/boss.jpg").convert_alpha()
-BOSS_IMAGE = pygame.transform.scale(BOSS_IMAGE, (3* CELL_SIZE - 8, 3* CELL_SIZE - 8))
-BOSS_IMAGE.set_alpha(128)
+    BLUEBANNER = pygame.image.load("./assets/blue banner-100.jpg").convert_alpha()
+    BLUEBANNER = pygame.transform.scale(BLUEBANNER, (CELL_SIZE - 8, CELL_SIZE - 8))
+    
+    BOSS = pygame.image.load("./assets/boss.jpg").convert_alpha()
+    BOSS = pygame.transform.scale(BOSS, (3* CELL_SIZE - 8, 3* CELL_SIZE - 8))
+    BOSS.set_alpha(128)
 
 # --- MAZE GENERATION (Randomized DFS + Extra Openings for Loops) ---
 def generate_maze(size, loop_density):
@@ -87,8 +87,8 @@ class bluebanner:
 
     def draw(self, screen, opacity=1):
         b_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4, self.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
-        BLUEBANNER_IMAGE.set_alpha(opacity * 255)
-        screen.blit(BLUEBANNER_IMAGE, b_rect)
+        Image.BLUEBANNER.set_alpha(opacity * 255)
+        screen.blit(Image.BLUEBANNER, b_rect)
 
     def spawn(self, maze, occupied_positions):
         while True:
@@ -108,7 +108,7 @@ class Player:
 
     def draw(self, screen):
         p_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4, self.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
-        screen.blit(PLAYER_IMAGE, p_rect)
+        screen.blit(Image.PLAYER, p_rect)
 
     def light_value(self, cell_pos):
         distance = sqrt((cell_pos[0] - self.pos[0])**2 + (cell_pos[1] - self.pos[1])**2)
@@ -173,8 +173,8 @@ class Ghost:
 
     def draw(self, screen, opacity=1):
         g_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4, self.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
-        GHOST_IMAGE.set_alpha(opacity * 255)
-        screen.blit(GHOST_IMAGE, g_rect)
+        Image.GHOST.set_alpha(opacity * 255)
+        screen.blit(Image.GHOST, g_rect)
 
     def heuristic(self, a, b):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
@@ -294,9 +294,9 @@ class Boss:
             self.move_cooldown = min(500, 500 / (.1 * self.heuristic(tuple(player_pos), tuple(self.pos))))
 
     def draw(self, screen, opacity = 1):
-        BOSS_IMAGE.set_alpha(opacity * 255)
+        Image.BOSS.set_alpha(opacity * 255)
         b_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4 - CELL_SIZE // 2, self.pos[1] * CELL_SIZE + 4 - CELL_SIZE // 2, 3 * CELL_SIZE - 8, 3 * CELL_SIZE - 8)
-        screen.blit(BOSS_IMAGE, b_rect)
+        screen.blit(Image.BOSS, b_rect)
 
     def draw_path(self, screen):
         for step in self.path:
@@ -460,19 +460,19 @@ while running:
         print(f"REGIONAL WINS: {banners_collected}")
 
     # 3. Rendering Layers
-    screen.fill(COLOR_BG)
+    screen.fill(Color.BG)
     
     for row in range(GRID_SIZE):
         for col in range(GRID_SIZE):
             pos = (col * CELL_SIZE, row * CELL_SIZE)
             rect = pygame.Rect(pos, (CELL_SIZE, CELL_SIZE))
             if maze[row][col].terrain_type == "wall":
-                color = COLOR_WALL
+                color = Color.WALL
                 if not debug:
                     light = player.light_value((col, row))
-                    color = (COLOR_BG[0] * (1 - light) + COLOR_WALL[0] * light, 
-                            COLOR_BG[1] * (1 - light) + COLOR_WALL[1] * light, 
-                            COLOR_BG[2] * (1 - light) + COLOR_WALL[2] * light)
+                    color = (Color.BG[0] * (1 - light) + Color.WALL[0] * light, 
+                            Color.BG[1] * (1 - light) + Color.WALL[1] * light, 
+                            Color.BG[2] * (1 - light) + Color.WALL[2] * light)
                 pygame.draw.rect(screen, color, rect)
    
     for ghost in ghosts:
