@@ -111,6 +111,10 @@ class Sound:
             s.set_volume(max(0.2+len(self.pastSteps)/10*0.8, 1))
             s.play()
             self.sLastPant = time.time()
+
+        if len(newSteps) > 0:
+            Sound.rollLimitless(Sound.__STEP).play()
+
         return newBPM
 
 
