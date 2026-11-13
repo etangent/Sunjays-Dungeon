@@ -1,5 +1,5 @@
 from math import sqrt
-import pygame, random, heapq, sys, time
+import pygame, random, heapq, sys, time, math, array
 
 # Initialize Pygame
 pygame.init()
@@ -40,41 +40,78 @@ class Image:
 
 class Sound:
     PATH = "./assets/sounds/"
-    __PANT = [""]
+    __PANT = ["breathing{}.wav".format(x) for x in range(2,4+1)]
     PANTS = []
-    __BEAT = [""]
+    __BEAT = ["beat.wav"]
     BEATS = []
-    __STEP = [""]
+    __STEP = ["walk{}.wav".format(x) for x in range(2,7+1)]
     STEPS = []
+    SCARE = pygame.mixer.Sound(PATH + "scare.wav")
 
     @staticmethod
     def load():
         Sound.PANTS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.__PANT]
         Sound.BEATS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.__BEAT]
         Sound.STEPS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.__STEP]
+    @staticmethod
+    def speedShift(sound, speed=1.4):
+        samples = array.array('h', sound.get_raw())
+        channels = 2 # 1 for mono
+        step = max(1, int(speed))
+        faster = samples[::step * channels]
+        return pygame.mixer.Sound(buffer=faster.tobytes())
+    @staticmethod
+    def roll(sounds) -> pygame.mixer.Sound:
+        return sounds[random.randint(0, len(sounds)-1)]
+    @staticmethod
+    def rollLimitless(soundPaths) -> pygame.mixer.Sound:
+        return pygame.mixer.Sound(Sound.PATH+soundPaths[random.randint(0, len(soundPaths)-1)])
 
     def __init__(self):
         Sound.load()
         self.pastSteps = []
         curr = time.time()
-        self.lastPant = curr
-        self.lastBeat = curr
-        self.lastStep = curr
+        self.sLastPant = curr
+        self.sLastBeat = curr
+        self.sLastStep = curr
+        self.sLastScare = 0
+        self.lastBPM = 80
+        self.baseBPM = 80
+        self.stepBasedBPMV = 0
+        self.scaredBasedBPMV = 0
 
-    def process(self, newSteps:list, ):
-        if len(newSteps)>0:
-            pass
-
+    def process(self, newSteps:list, dist):
         self.pastSteps.extend(newSteps)
         self.pastSteps = [x for x in self.pastSteps if time.time()-x<10]
 
+        self.stepBasedBPMV = math.log10(len(self.pastSteps))*25 if len(self.pastSteps)>0 else 0
+        if dist < Player.LIGHT_LEVEL and self.lastBPM < 150: # gotta run!
+            self.scaredBasedBPMV = random.randint(50, 100)
+        else:
+            self.scaredBasedBPMV = self.scaredBasedBPMV*0.99
 
+        if dist < Player.LIGHT_LEVEL*0.8 and self.sLastScare+10<time.time():
+            Sound.SCARE.set_volume(dist/Player.LIGHT_LEVEL)
+            Sound.SCARE.play()
+            self.sLastScare = time.time()
 
-        
+        newBPM = min(max(50, self.baseBPM+self.stepBasedBPMV+self.scaredBasedBPMV), 180)
+        self.lastBPM += (newBPM-self.lastBPM)*0.05
+        # print(self.lastBPM, newBPM)
 
+        if self.sLastBeat+60/self.lastBPM < time.time():
+            # Sound.roll(Sound.BEATS).play()
+            s = Sound.rollLimitless(Sound.__BEAT)
+            s.set_volume(0.2+max(0, (self.scaredBasedBPMV-80)/100*0.8))
+            s.play()
+            self.sLastBeat = time.time()
 
-         
-                
+        if self.sLastPant+max(0.4, 1.5-len(self.pastSteps)*0.08)<time.time():
+            s = Sound.speedShift(Sound.rollLimitless(Sound.__PANT), 1+len(self.pastSteps)*0.01)
+            s.set_volume(max(0.2+len(self.pastSteps)/10*0.8, 1))
+            s.play()
+            self.sLastPant = time.time()
+        return newBPM
 
 
 # --- MAZE GENERATION (Randomized DFS + Extra Openings for Loops) ---
@@ -115,7 +152,7 @@ class Cell:
         self.y = y
         self.terrain_type = terrain_type
 
-class bluebanner:
+class BlueBanner:
     def __init__(self, maze, occupied_positions):
         self.pos = [1, 1]
         self.spawn(maze, occupied_positions)
@@ -134,11 +171,12 @@ class bluebanner:
                 break
 
 class Player:
+    LIGHT_LEVEL = 4
     def __init__(self, start_pos, move_cooldown, color, last_trip = 0):
         self.pos = list(start_pos)
         self.move_cooldown = move_cooldown
         self.color = color
-        self.light_level = 4
+        self.light_level = Player.LIGHT_LEVEL
         self.last_trip = last_trip
 
     def draw(self, screen):
@@ -406,8 +444,10 @@ PLAYER_COOLDOWN = 150
 last_player_move_time = pygame.time.get_ticks()
 
 occupied = [player.pos, boss.pos] + [g.pos for g in ghosts]
-banner = bluebanner(maze, occupied)
+banner = BlueBanner(maze, occupied)
 banners_collected = 0
+
+sound = Sound()
 
 # --- MAIN GAME LOOP ---
 avg_move_time = (0, 0)
@@ -416,7 +456,7 @@ running = True
 last_player_move = "up"
 while running:
     current_time = pygame.time.get_ticks()
-    
+
     # 1. Event Handling
     dx, dy = 0, 0
     for event in pygame.event.get():
@@ -435,6 +475,10 @@ while running:
                 dx = -1
             elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                 dx = 1
+
+    # 1.5 audio and extra vfx
+    bpm = sound.process([time.time() for x in range(abs(dx+dy))], math.sqrt((boss.pos[0]-player.pos[0])**2 + (boss.pos[1]-player.pos[1])**2))
+    lightBounce = (math.sin(time.time())/10+0.9)*max(0.5, min(1, (180-bpm)/80))
 
     trip_chance = 0
     # 2. Update Positions
@@ -495,7 +539,8 @@ while running:
         print(f"REGIONAL WINS: {banners_collected}")
 
     # 3. Rendering Layers
-    screen.fill(Color.BG)
+    _screen.fill([x*lightBounce for x in Color.BG])
+    screen.fill([x*lightBounce for x in Color.BG])
     
     for row in range(GRID_SIZE):
         for col in range(GRID_SIZE):
@@ -508,7 +553,7 @@ while running:
                     color = (Color.BG[0] * (1 - light) + Color.WALL[0] * light, 
                             Color.BG[1] * (1 - light) + Color.WALL[1] * light, 
                             Color.BG[2] * (1 - light) + Color.WALL[2] * light)
-                pygame.draw.rect(screen, color, rect)
+                pygame.draw.rect(screen, [x*lightBounce for x in color], rect)
    
     for ghost in ghosts:
         if not debug:
@@ -538,7 +583,8 @@ while running:
         label = font.render("TRIPPED!", True, (255, 0, 0))
         screen.blit(label, (player.pos[0] * CELL_SIZE - 25, player.pos[1] * CELL_SIZE + 5))
 
-    _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (0, 0))
+    s = lambda: ((max(100, bpm)-100)/15)*random.random()
+    _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (s(), s()))
     pygame.display.flip()
     clock.tick(30)
 
