@@ -1,13 +1,9 @@
 from math import sqrt
-
-import pygame
-import random
-import heapq
-import sys
+import pygame, random, heapq, sys, time
 
 # Initialize Pygame
 pygame.init()
-
+pygame.mixer.init()
 
 # Grid and Screen Dimensions
 WIDTH = 900
@@ -37,10 +33,49 @@ class Image:
 
     BLUEBANNER = pygame.image.load("./assets/blue banner-100.jpg").convert_alpha()
     BLUEBANNER = pygame.transform.scale(BLUEBANNER, (CELL_SIZE - 8, CELL_SIZE - 8))
-    
+
     BOSS = pygame.image.load("./assets/boss.jpg").convert_alpha()
     BOSS = pygame.transform.scale(BOSS, (3* CELL_SIZE - 8, 3* CELL_SIZE - 8))
     BOSS.set_alpha(128)
+
+class Sound:
+    PATH = "./assets/sounds/"
+    __PANT = [""]
+    PANTS = []
+    __BEAT = [""]
+    BEATS = []
+    __STEP = [""]
+    STEPS = []
+
+    @staticmethod
+    def load():
+        Sound.PANTS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.__PANT]
+        Sound.BEATS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.__BEAT]
+        Sound.STEPS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.__STEP]
+
+    def __init__(self):
+        Sound.load()
+        self.pastSteps = []
+        curr = time.time()
+        self.lastPant = curr
+        self.lastBeat = curr
+        self.lastStep = curr
+
+    def process(self, newSteps:list, ):
+        if len(newSteps)>0:
+            pass
+
+        self.pastSteps.extend(newSteps)
+        self.pastSteps = [x for x in self.pastSteps if time.time()-x<10]
+
+
+
+        
+
+
+         
+                
+
 
 # --- MAZE GENERATION (Randomized DFS + Extra Openings for Loops) ---
 def generate_maze(size, loop_density):
