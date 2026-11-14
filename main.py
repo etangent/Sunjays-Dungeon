@@ -616,7 +616,7 @@ while running and not playing:
         if event.type == pygame.QUIT:
             running = False
     if not(banners_collected == 3):
-        if (time.time()-endStart) > 6:
+        if (time.time()-endStart) > 7:
             running = False
         scale = max(0,1-((time.time()-endStart)/5))
         screen.fill((0,0,0))
