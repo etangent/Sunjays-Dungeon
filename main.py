@@ -616,6 +616,8 @@ while running and not playing:
         if event.type == pygame.QUIT:
             running = False
     if not(banners_collected == 3):
+        if (time.time()-endStart) > 6:
+            running = False
         scale = max(0,1-((time.time()-endStart)/5))
         screen.fill((0,0,0))
         if random.random() < 0.5*scale:
@@ -626,8 +628,7 @@ while running and not playing:
             s.play()
         if random.random() < 0.3*scale:
             screen.blit(Image.RED, (WIDTH/2-Image.RED.get_width()/2, HEIGHT/2-Image.RED.get_height()/2))
-
-    _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (random.randint(-15,15),random.randint(-15,15)))
+        _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (random.randint(-15,15),random.randint(-15,15)))
     pygame.display.flip()
     clock.tick(30)
 
