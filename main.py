@@ -38,6 +38,10 @@ class Image:
     BOSS = pygame.transform.scale(BOSS, (3* CELL_SIZE - 8, 3* CELL_SIZE - 8))
     BOSS.set_alpha(128)
 
+    RED = pygame.image.load("./assets/red.png").convert_alpha()
+    RED = pygame.transform.scale(RED, (WIDTH, HEIGHT))
+    # RED.fill((120, 0, 0), special_flags=pygame.BLEND_RGB_MULT)
+
 class Sound:
     PATH = "./assets/sounds/"
     __PANT = ["breathing{}.wav".format(x) for x in range(2,4+1)]
@@ -457,6 +461,7 @@ sound = Sound()
 avg_move_time = (0, 0)
 debug = False
 running = True
+playing = True
 last_player_move = "up"
 while running:
     current_time = pygame.time.get_ticks()
@@ -483,6 +488,9 @@ while running:
     # 1.5 audio and extra vfx
     bpm = sound.process([time.time() for x in range(abs(dx+dy))], math.sqrt((boss.pos[0]-player.pos[0])**2 + (boss.pos[1]-player.pos[1])**2))
     lightBounce = (math.sin(time.time())/10+0.9)*max(0.5, min(1, (180-bpm)/80))
+
+    pulse = (math.sin(time.time()*2*math.pi*bpm/60)+1) / 2
+    redAlpha = int(max(0, min(200, (bpm-100)*2))*(0.5+0.5*pulse))
 
     trip_chance = 0
     # 2. Update Positions
@@ -524,10 +532,10 @@ while running:
     for ghost in ghosts:
         if player.pos == ghost.pos:
             print("Game Over! You got cornered by the AI.")
-            running = False
+            playing = False
     if player.pos == boss.pos:
         print("Game Over! You got cornered by the Boss.")
-        running = False
+        playing = False
 
     if not running:
         break
@@ -579,7 +587,7 @@ while running:
 
     if banners_collected == 3:
         print("Congratulations! You've collected 3 blue banners and won the game!")
-        running = False
+        playing = False
 
     player.draw(screen)
     if (current_time > 1000 and current_time - player.last_trip < 1000):
@@ -589,6 +597,8 @@ while running:
 
     s = lambda: ((max(100, bpm)-100)/15)*random.random()
     _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (s(), s()))
+    Image.RED.set_alpha(redAlpha)
+    _screen.blit(Image.RED, (0, 0))
     pygame.display.flip()
     clock.tick(30)
 
