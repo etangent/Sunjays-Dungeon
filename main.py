@@ -1,44 +1,131 @@
 from math import sqrt
-
-import pygame
-import random
-import heapq
-import sys
+import pygame, random, heapq, sys, time, math, array
 
 # Initialize Pygame
 pygame.init()
-
+pygame.mixer.init()
+pygame.mixer.set_num_channels(16)
+pygame.mixer.set_reserved(1)
 
 # Grid and Screen Dimensions
 WIDTH = 900
 HEIGHT = WIDTH
+SCALE = 0.7
 GRID_SIZE = 30
 CELL_SIZE = WIDTH // GRID_SIZE
 
 # Setup Display
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+_screen = pygame.display.set_mode((int(WIDTH*SCALE), int(HEIGHT*SCALE)), pygame.SCALED)
+screen = pygame.Surface((WIDTH, HEIGHT))
 pygame.display.set_caption("Sunjay's Dungeon")
 clock = pygame.time.Clock()
 
-# Colors
-COLOR_BG = (20, 20, 30)
-COLOR_WALL = (50, 50, 70)
-COLOR_PATH = (0, 180, 216)      # Light blue for A* path
-COLOR_PLAYER = (46, 196, 182)    # Turquoise
+class Color:
+    BG = (20, 20, 30)
+    WALL = (50, 50, 70)
+    PATH = (0, 180, 216)      # Light blue for A* path
+    PLAYER = (46, 196, 182)    # Turquoise
 
-GHOST_IMAGE = pygame.image.load("./assets/ghost.jpg").convert_alpha()
-GHOST_IMAGE = pygame.transform.scale(GHOST_IMAGE, (CELL_SIZE - 8, CELL_SIZE - 8))
+class Image:
+    GHOST = pygame.image.load("./assets/ghost.jpg").convert_alpha()
+    GHOST = pygame.transform.scale(GHOST, (CELL_SIZE - 8, CELL_SIZE - 8))
 
-PLAYER_IMAGE = pygame.image.load("./assets/player.jpg").convert_alpha()
-PLAYER_IMAGE = pygame.transform.scale(PLAYER_IMAGE, (CELL_SIZE - 8, CELL_SIZE - 8))
+    PLAYER = pygame.image.load("./assets/player.jpg").convert_alpha()
+    PLAYER = pygame.transform.scale(PLAYER, (CELL_SIZE - 8, CELL_SIZE - 8))
 
-BLUEBANNER_IMAGE = pygame.image.load("./assets/blue banner-100.jpg").convert_alpha()
-BLUEBANNER_IMAGE = pygame.transform.scale(BLUEBANNER_IMAGE, (CELL_SIZE - 8, CELL_SIZE - 8))
+    BLUEBANNER = pygame.image.load("./assets/blue banner-100.jpg").convert_alpha()
+    BLUEBANNER = pygame.transform.scale(BLUEBANNER, (CELL_SIZE - 8, CELL_SIZE - 8))
 
+    BOSS = pygame.image.load("./assets/boss.jpg").convert_alpha()
+    ENDSCREEN_BOSS = pygame.transform.scale(BOSS, (WIDTH, HEIGHT))
+    BOSS = pygame.transform.scale(BOSS, (3* CELL_SIZE - 8, 3* CELL_SIZE - 8))
+    BOSS.set_alpha(128)
 
-BOSS_IMAGE = pygame.image.load("./assets/boss.jpg").convert_alpha()
-BOSS_IMAGE = pygame.transform.scale(BOSS_IMAGE, (3* CELL_SIZE - 8, 3* CELL_SIZE - 8))
-BOSS_IMAGE.set_alpha(128)
+    RED = pygame.image.load("./assets/red.png").convert_alpha()
+    RED = pygame.transform.scale(RED, (WIDTH*3, HEIGHT*3))
+    # RED.fill((120, 0, 0), special_flags=pygame.BLEND_RGB_MULT)
+
+class Sound:
+    PATH = "./assets/sounds/"
+    P_PANT = ["breathing{}.wav".format(x) for x in range(2,4+1)]
+    PANTS = []
+    P_BEAT = ["beat.wav"]
+    BEATS = []
+    P_STEP = ["walk{}.wav".format(x) for x in range(2,7+1)]
+    STEPS = []
+    SCARE = pygame.mixer.Sound(PATH + "scare.wav")
+    SCREAM = pygame.mixer.Sound(PATH + "shrek screams.wav")
+    SCREAM_CHANNEL = pygame.mixer.Channel(0)
+
+    @staticmethod
+    def load():
+        Sound.PANTS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.P_PANT]
+        Sound.BEATS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.P_BEAT]
+        Sound.STEPS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.P_STEP]
+    @staticmethod
+    def speedShift(sound, speed=1.4):
+        samples = array.array('h', sound.get_raw())
+        channels = 2 # 1 for mono
+        step = max(1, int(speed))
+        faster = samples[::step * channels]
+        return pygame.mixer.Sound(buffer=faster.tobytes())
+    @staticmethod
+    def roll(sounds) -> pygame.mixer.Sound:
+        return sounds[random.randint(0, len(sounds)-1)]
+    @staticmethod
+    def rollLimitless(soundPaths) -> pygame.mixer.Sound:
+        return pygame.mixer.Sound(Sound.PATH+soundPaths[random.randint(0, len(soundPaths)-1)])
+
+    def __init__(self):
+        Sound.load()
+        self.pastSteps = []
+        curr = time.time()
+        self.sLastPant = curr
+        self.sLastBeat = curr
+        self.sLastStep = curr
+        self.sLastScare = 0
+        self.lastBPM = 80
+        self.baseBPM = 80
+        self.stepBasedBPMV = 0
+        self.scaredBasedBPMV = 0
+
+    def process(self, newSteps:list, dist):
+        self.pastSteps.extend(newSteps)
+        self.pastSteps = [x for x in self.pastSteps if time.time()-x<10]
+
+        self.stepBasedBPMV = math.log10(len(self.pastSteps))*25 if len(self.pastSteps)>0 else 0
+        if dist < Player.LIGHT_LEVEL and self.lastBPM < 150: # gotta run!
+            self.scaredBasedBPMV = random.randint(50, 100)
+        else:
+            self.scaredBasedBPMV = self.scaredBasedBPMV*0.99
+
+        if dist < Player.LIGHT_LEVEL*0.8 and self.sLastScare+10<time.time():
+            Sound.SCARE.set_volume(dist/Player.LIGHT_LEVEL)
+            Sound.SCARE.play()
+            self.sLastScare = time.time()
+
+        newBPM = min(max(50, self.baseBPM+self.stepBasedBPMV+self.scaredBasedBPMV), 180)
+        self.lastBPM += (newBPM-self.lastBPM)*0.05
+        # print(self.lastBPM, newBPM)
+
+        if self.sLastBeat+60/self.lastBPM < time.time():
+            # Sound.roll(Sound.BEATS).play()
+            s = Sound.rollLimitless(Sound.P_BEAT)
+            s.set_volume(0.2+max(0, (self.scaredBasedBPMV-80)/100*0.8))
+            s.play()
+            self.sLastBeat = time.time()
+
+        if self.sLastPant+max(0.4, 1.5-len(self.pastSteps)*0.08)<time.time():
+            s = Sound.speedShift(Sound.rollLimitless(Sound.P_PANT), 1+len(self.pastSteps)*0.01)
+            s.set_volume(max(0.2+len(self.pastSteps)/10*0.8, 1))
+            s.play()
+            self.sLastPant = time.time()
+
+        if len(newSteps) > 0:
+            Sound.rollLimitless(Sound.P_STEP).play()
+
+        return newBPM
+
 
 # --- MAZE GENERATION (Randomized DFS + Extra Openings for Loops) ---
 def generate_maze(size, loop_density):
@@ -78,15 +165,15 @@ class Cell:
         self.y = y
         self.terrain_type = terrain_type
 
-class bluebanner:
+class BlueBanner:
     def __init__(self, maze, occupied_positions):
         self.pos = [1, 1]
         self.spawn(maze, occupied_positions)
 
     def draw(self, screen, opacity=1):
         b_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4, self.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
-        BLUEBANNER_IMAGE.set_alpha(opacity * 255)
-        screen.blit(BLUEBANNER_IMAGE, b_rect)
+        Image.BLUEBANNER.set_alpha(opacity * 255)
+        screen.blit(Image.BLUEBANNER, b_rect)
 
     def spawn(self, maze, occupied_positions):
         while True:
@@ -97,16 +184,17 @@ class bluebanner:
                 break
 
 class Player:
+    LIGHT_LEVEL = 4
     def __init__(self, start_pos, move_cooldown, color, last_trip = 0):
         self.pos = list(start_pos)
         self.move_cooldown = move_cooldown
         self.color = color
-        self.light_level = 4
+        self.light_level = Player.LIGHT_LEVEL
         self.last_trip = last_trip
 
     def draw(self, screen):
         p_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4, self.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
-        screen.blit(PLAYER_IMAGE, p_rect)
+        screen.blit(Image.PLAYER, p_rect)
 
     def light_value(self, cell_pos):
         distance = sqrt((cell_pos[0] - self.pos[0])**2 + (cell_pos[1] - self.pos[1])**2)
@@ -171,8 +259,8 @@ class Ghost:
 
     def draw(self, screen, opacity=1):
         g_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4, self.pos[1] * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
-        GHOST_IMAGE.set_alpha(opacity * 255)
-        screen.blit(GHOST_IMAGE, g_rect)
+        Image.GHOST.set_alpha(opacity * 255)
+        screen.blit(Image.GHOST, g_rect)
 
     def heuristic(self, a, b):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
@@ -292,9 +380,9 @@ class Boss:
             self.move_cooldown = min(500, 500 / (.1 * self.heuristic(tuple(player_pos), tuple(self.pos))))
 
     def draw(self, screen, opacity = 1):
-        BOSS_IMAGE.set_alpha(opacity * 255)
+        Image.BOSS.set_alpha(opacity * 255)
         b_rect = pygame.Rect(self.pos[0] * CELL_SIZE + 4 - CELL_SIZE // 2, self.pos[1] * CELL_SIZE + 4 - CELL_SIZE // 2, 3 * CELL_SIZE - 8, 3 * CELL_SIZE - 8)
-        screen.blit(BOSS_IMAGE, b_rect)
+        screen.blit(Image.BOSS, b_rect)
 
     def draw_path(self, screen):
         for step in self.path:
@@ -369,17 +457,20 @@ PLAYER_COOLDOWN = 150
 last_player_move_time = pygame.time.get_ticks()
 
 occupied = [player.pos, boss.pos] + [g.pos for g in ghosts]
-banner = bluebanner(maze, occupied)
+banner = BlueBanner(maze, occupied)
 banners_collected = 0
+
+sound = Sound()
 
 # --- MAIN GAME LOOP ---
 avg_move_time = (0, 0)
 debug = False
 running = True
+playing = True
 last_player_move = "up"
-while running:
+while running and playing:
     current_time = pygame.time.get_ticks()
-    
+
     # 1. Event Handling
     dx, dy = 0, 0
     for event in pygame.event.get():
@@ -398,6 +489,13 @@ while running:
                 dx = -1
             elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                 dx = 1
+
+    # 1.5 audio and extra vfx
+    bpm = sound.process([time.time() for x in range(abs(dx+dy))], math.sqrt((boss.pos[0]-player.pos[0])**2 + (boss.pos[1]-player.pos[1])**2))
+    lightBounce = (math.sin(time.time())/10+0.9)*max(0.5, min(1, (180-bpm)/80))
+
+    pulse = (math.sin(time.time()*2*math.pi*bpm/60)+1) / 2
+    redAlpha = int(max(0, min(200, (bpm-100)*2))*(0.5+0.5*pulse))
 
     trip_chance = 0
     # 2. Update Positions
@@ -439,10 +537,10 @@ while running:
     for ghost in ghosts:
         if player.pos == ghost.pos:
             print("Game Over! You got cornered by the AI.")
-            running = False
+            playing = False
     if player.pos == boss.pos:
         print("Game Over! You got cornered by the Boss.")
-        running = False
+        playing = False
 
     if not running:
         break
@@ -458,20 +556,21 @@ while running:
         print(f"REGIONAL WINS: {banners_collected}")
 
     # 3. Rendering Layers
-    screen.fill(COLOR_BG)
+    _screen.fill([x*lightBounce for x in Color.BG])
+    screen.fill([x*lightBounce for x in Color.BG])
     
     for row in range(GRID_SIZE):
         for col in range(GRID_SIZE):
             pos = (col * CELL_SIZE, row * CELL_SIZE)
             rect = pygame.Rect(pos, (CELL_SIZE, CELL_SIZE))
             if maze[row][col].terrain_type == "wall":
-                color = COLOR_WALL
+                color = Color.WALL
                 if not debug:
                     light = player.light_value((col, row))
-                    color = (COLOR_BG[0] * (1 - light) + COLOR_WALL[0] * light, 
-                            COLOR_BG[1] * (1 - light) + COLOR_WALL[1] * light, 
-                            COLOR_BG[2] * (1 - light) + COLOR_WALL[2] * light)
-                pygame.draw.rect(screen, color, rect)
+                    color = (Color.BG[0] * (1 - light) + Color.WALL[0] * light, 
+                            Color.BG[1] * (1 - light) + Color.WALL[1] * light, 
+                            Color.BG[2] * (1 - light) + Color.WALL[2] * light)
+                pygame.draw.rect(screen, [x*lightBounce for x in color], rect)
    
     for ghost in ghosts:
         if not debug:
@@ -493,7 +592,7 @@ while running:
 
     if banners_collected == 3:
         print("Congratulations! You've collected 3 blue banners and won the game!")
-        running = False
+        playing = False
 
     player.draw(screen)
     if (current_time > 1000 and current_time - player.last_trip < 1000):
@@ -501,6 +600,35 @@ while running:
         label = font.render("TRIPPED!", True, (255, 0, 0))
         screen.blit(label, (player.pos[0] * CELL_SIZE - 25, player.pos[1] * CELL_SIZE + 5))
 
+    Image.RED.set_alpha(redAlpha)
+    screen.blit(Image.RED, (player.pos[0]*CELL_SIZE+4+4-Image.RED.get_width()/2, player.pos[1]*CELL_SIZE+4+4-Image.RED.get_height()/2))
+    s = lambda: ((max(100, bpm)-100)/15)*random.random()
+    _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (s(), s()))
+    pygame.display.flip()
+    clock.tick(30)
+
+# endscreen
+if not(banners_collected == 3):
+    Sound.SCREAM_CHANNEL.play(Sound.SCREAM)
+endStart = time.time()
+while running and not playing:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+    if not(banners_collected == 3):
+        if (time.time()-endStart) > 7:
+            running = False
+        scale = max(0,1-((time.time()-endStart)/5))
+        screen.fill((0,0,0))
+        if random.random() < 0.5*scale:
+            Image.ENDSCREEN_BOSS.set_alpha(255-int(255*scale))
+            screen.blit(Image.ENDSCREEN_BOSS, (0,0))
+            s = Sound.rollLimitless(Sound.P_BEAT)
+            s.set_volume(scale)
+            s.play()
+        if random.random() < 0.3*scale:
+            screen.blit(Image.RED, (WIDTH/2-Image.RED.get_width()/2, HEIGHT/2-Image.RED.get_height()/2))
+        _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (random.randint(-15,15),random.randint(-15,15)))
     pygame.display.flip()
     clock.tick(30)
 
