@@ -1,3 +1,3 @@
 # Sunjay's Dungeon
 
-*Have we ventured too far?*
+*Have you ventured too far?*

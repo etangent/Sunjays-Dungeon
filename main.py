@@ -4,6 +4,8 @@ import pygame, random, heapq, sys, time, math, array
 # Initialize Pygame
 pygame.init()
 pygame.mixer.init()
+pygame.mixer.set_num_channels(16)
+pygame.mixer.set_reserved(1)
 
 # Grid and Screen Dimensions
 WIDTH = 900
@@ -35,28 +37,31 @@ class Image:
     BLUEBANNER = pygame.transform.scale(BLUEBANNER, (CELL_SIZE - 8, CELL_SIZE - 8))
 
     BOSS = pygame.image.load("./assets/boss.jpg").convert_alpha()
+    ENDSCREEN_BOSS = pygame.transform.scale(BOSS, (WIDTH, HEIGHT))
     BOSS = pygame.transform.scale(BOSS, (3* CELL_SIZE - 8, 3* CELL_SIZE - 8))
     BOSS.set_alpha(128)
 
     RED = pygame.image.load("./assets/red.png").convert_alpha()
-    RED = pygame.transform.scale(RED, (WIDTH, HEIGHT))
+    RED = pygame.transform.scale(RED, (WIDTH*3, HEIGHT*3))
     # RED.fill((120, 0, 0), special_flags=pygame.BLEND_RGB_MULT)
 
 class Sound:
     PATH = "./assets/sounds/"
-    __PANT = ["breathing{}.wav".format(x) for x in range(2,4+1)]
+    P_PANT = ["breathing{}.wav".format(x) for x in range(2,4+1)]
     PANTS = []
-    __BEAT = ["beat.wav"]
+    P_BEAT = ["beat.wav"]
     BEATS = []
-    __STEP = ["walk{}.wav".format(x) for x in range(2,7+1)]
+    P_STEP = ["walk{}.wav".format(x) for x in range(2,7+1)]
     STEPS = []
     SCARE = pygame.mixer.Sound(PATH + "scare.wav")
+    SCREAM = pygame.mixer.Sound(PATH + "shrek screams.wav")
+    SCREAM_CHANNEL = pygame.mixer.Channel(0)
 
     @staticmethod
     def load():
-        Sound.PANTS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.__PANT]
-        Sound.BEATS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.__BEAT]
-        Sound.STEPS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.__STEP]
+        Sound.PANTS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.P_PANT]
+        Sound.BEATS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.P_BEAT]
+        Sound.STEPS = [pygame.mixer.Sound(Sound.PATH+x) for x in Sound.P_STEP]
     @staticmethod
     def speedShift(sound, speed=1.4):
         samples = array.array('h', sound.get_raw())
@@ -105,19 +110,19 @@ class Sound:
 
         if self.sLastBeat+60/self.lastBPM < time.time():
             # Sound.roll(Sound.BEATS).play()
-            s = Sound.rollLimitless(Sound.__BEAT)
+            s = Sound.rollLimitless(Sound.P_BEAT)
             s.set_volume(0.2+max(0, (self.scaredBasedBPMV-80)/100*0.8))
             s.play()
             self.sLastBeat = time.time()
 
         if self.sLastPant+max(0.4, 1.5-len(self.pastSteps)*0.08)<time.time():
-            s = Sound.speedShift(Sound.rollLimitless(Sound.__PANT), 1+len(self.pastSteps)*0.01)
+            s = Sound.speedShift(Sound.rollLimitless(Sound.P_PANT), 1+len(self.pastSteps)*0.01)
             s.set_volume(max(0.2+len(self.pastSteps)/10*0.8, 1))
             s.play()
             self.sLastPant = time.time()
 
         if len(newSteps) > 0:
-            Sound.rollLimitless(Sound.__STEP).play()
+            Sound.rollLimitless(Sound.P_STEP).play()
 
         return newBPM
 
@@ -463,7 +468,7 @@ debug = False
 running = True
 playing = True
 last_player_move = "up"
-while running:
+while running and playing:
     current_time = pygame.time.get_ticks()
 
     # 1. Event Handling
@@ -595,10 +600,34 @@ while running:
         label = font.render("TRIPPED!", True, (255, 0, 0))
         screen.blit(label, (player.pos[0] * CELL_SIZE - 25, player.pos[1] * CELL_SIZE + 5))
 
+    Image.RED.set_alpha(redAlpha)
+    screen.blit(Image.RED, (player.pos[0]*CELL_SIZE+4+4-Image.RED.get_width()/2, player.pos[1]*CELL_SIZE+4+4-Image.RED.get_height()/2))
     s = lambda: ((max(100, bpm)-100)/15)*random.random()
     _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (s(), s()))
-    Image.RED.set_alpha(redAlpha)
-    _screen.blit(Image.RED, (0, 0))
+    pygame.display.flip()
+    clock.tick(30)
+
+# endscreen
+if not(banners_collected == 3):
+    Sound.SCREAM_CHANNEL.play(Sound.SCREAM)
+endStart = time.time()
+while running and not playing:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+    if not(banners_collected == 3):
+        scale = max(0,1-((time.time()-endStart)/5))
+        screen.fill((0,0,0))
+        if random.random() < 0.5*scale:
+            Image.ENDSCREEN_BOSS.set_alpha(255-int(255*scale))
+            screen.blit(Image.ENDSCREEN_BOSS, (0,0))
+            s = Sound.rollLimitless(Sound.P_BEAT)
+            s.set_volume(scale)
+            s.play()
+        if random.random() < 0.3*scale:
+            screen.blit(Image.RED, (WIDTH/2-Image.RED.get_width()/2, HEIGHT/2-Image.RED.get_height()/2))
+
+    _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (random.randint(-15,15),random.randint(-15,15)))
     pygame.display.flip()
     clock.tick(30)
 
