@@ -10,7 +10,7 @@ pygame.mixer.set_reserved(1)
 # Grid and Screen Dimensions
 WIDTH = 900
 HEIGHT = WIDTH
-SCALE = 0.7
+SCALE = 1
 GRID_SIZE = 30
 CELL_SIZE = WIDTH // GRID_SIZE
 
