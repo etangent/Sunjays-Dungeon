@@ -57,6 +57,7 @@ class Sound:
     SCARE = pygame.mixer.Sound(PATH + "scare.wav")
     SCREAM = pygame.mixer.Sound(PATH + "shrek screams.wav")
     WIN = pygame.mixer.Sound(PATH + "outro.wav")
+    LAUGH = pygame.mixer.Sound(PATH + "laugh.wav")
     PRIORITY_CHANNEL = pygame.mixer.Channel(0)
 
     @staticmethod
@@ -125,7 +126,10 @@ class Sound:
 
         if len(newSteps) > 0:
             Sound.rollLimitless(Sound.P_STEP).play()
-
+        
+        Sound.LAUGH.set_volume(min(max(0, (Player.LIGHT_LEVEL*2-dist)/(Player.LIGHT_LEVEL*1)), 1))
+        if newBPM>150 and not(self.PRIORITY_CHANNEL.get_busy()):
+            self.PRIORITY_CHANNEL.play(Sound.LAUGH)
         return newBPM
 
 
@@ -610,6 +614,7 @@ while running and playing:
     clock.tick(30)
 
 # endscreen
+Sound.PRIORITY_CHANNEL.stop()
 if not(banners_collected >= 3):
     Sound.PRIORITY_CHANNEL.play(Sound.SCREAM)
 else:
