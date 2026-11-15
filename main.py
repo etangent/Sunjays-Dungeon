@@ -119,7 +119,7 @@ class Sound:
 
         if self.sLastPant+max(0.4, 1.5-len(self.pastSteps)*0.08)<time.time():
             s = Sound.speedShift(Sound.rollLimitless(Sound.P_PANT), 1+len(self.pastSteps)*0.01)
-            s.set_volume(max(0.2+len(self.pastSteps)/10*0.8, 1))
+            s.set_volume(max(0.3+len(self.pastSteps)/10*0.7, 1))
             s.play()
             self.sLastPant = time.time()
 
