@@ -103,7 +103,7 @@ class Sound:
             self.scaredBasedBPMV = self.scaredBasedBPMV*0.99
 
         if dist < Player.LIGHT_LEVEL*0.8 and self.sLastScare+10<time.time():
-            Sound.SCARE.set_volume(dist/Player.LIGHT_LEVEL)
+            Sound.SCARE.set_volume(Player.LIGHT_LEVEL/dist)
             Sound.SCARE.play()
             self.sLastScare = time.time()
 
@@ -127,7 +127,7 @@ class Sound:
         if len(newSteps) > 0:
             Sound.rollLimitless(Sound.P_STEP).play()
         
-        Sound.LAUGH.set_volume(min(max(0, (Player.LIGHT_LEVEL*2-dist)/(Player.LIGHT_LEVEL*1)), 1))
+        Sound.LAUGH.set_volume(min(max(0, (dist-Player.LIGHT_LEVEL*2)/(Player.LIGHT_LEVEL*1)), 1))
         if newBPM>150 and not(self.PRIORITY_CHANNEL.get_busy()):
             self.PRIORITY_CHANNEL.play(Sound.LAUGH)
         return newBPM
@@ -497,11 +497,13 @@ while running and playing:
                 dx = 1
 
     # 1.5 audio and extra vfx
-    bpm = sound.process([time.time() for x in range(abs(dx+dy))], math.sqrt((boss.pos[0]-player.pos[0])**2 + (boss.pos[1]-player.pos[1])**2))
+    bpm = sound.process([time.time() for _ in range(abs(dx+dy))], math.sqrt((boss.pos[0]-player.pos[0])**2 + (boss.pos[1]-player.pos[1])**2))
     lightBounce = (math.sin(time.time())/10+0.9)*max(0.5, min(1, (180-bpm)/80))
 
     pulse = (math.sin(time.time()*2*math.pi*bpm/60)+1) / 2
-    redAlpha = int(max(0, min(200, (bpm-100)*2))*(0.5+0.5*pulse))
+    dist_to_player = math.dist(boss.pos, player.pos)
+    amplitude = ((GRID_SIZE - dist_to_player) / GRID_SIZE) * .5
+    redAlpha = int(max(0, min(200, (bpm-100)*amplitude))*(0.5+0.5*pulse))
 
     trip_chance = 0
     # 2. Update Positions
