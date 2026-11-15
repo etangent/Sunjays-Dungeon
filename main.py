@@ -627,6 +627,7 @@ while running and not playing:
             s.set_volume(scale)
             s.play()
         if random.random() < 0.3*scale:
+            Image.RED.set_alpha(32)
             screen.blit(Image.RED, (WIDTH/2-Image.RED.get_width()/2, HEIGHT/2-Image.RED.get_height()/2))
         _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (random.randint(-15,15),random.randint(-15,15)))
     pygame.display.flip()
