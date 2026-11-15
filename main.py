@@ -31,6 +31,7 @@ class Image:
     GHOST = pygame.transform.scale(GHOST, (CELL_SIZE - 8, CELL_SIZE - 8))
 
     PLAYER = pygame.image.load("./assets/player.jpg").convert_alpha()
+    ENDSCREEN_PLAYER = pygame.transform.scale(PLAYER, (WIDTH, HEIGHT))
     PLAYER = pygame.transform.scale(PLAYER, (CELL_SIZE - 8, CELL_SIZE - 8))
 
     BLUEBANNER = pygame.image.load("./assets/blue banner-100.jpg").convert_alpha()
@@ -55,7 +56,8 @@ class Sound:
     STEPS = []
     SCARE = pygame.mixer.Sound(PATH + "scare.wav")
     SCREAM = pygame.mixer.Sound(PATH + "shrek screams.wav")
-    SCREAM_CHANNEL = pygame.mixer.Channel(0)
+    WIN = pygame.mixer.Sound(PATH + "outro.wav")
+    PRIORITY_CHANNEL = pygame.mixer.Channel(0)
 
     @staticmethod
     def load():
@@ -608,14 +610,16 @@ while running and playing:
     clock.tick(30)
 
 # endscreen
-if not(banners_collected == 3):
-    Sound.SCREAM_CHANNEL.play(Sound.SCREAM)
+if not(banners_collected >= 3):
+    Sound.PRIORITY_CHANNEL.play(Sound.SCREAM)
+else:
+    Sound.PRIORITY_CHANNEL.play(Sound.WIN)
 endStart = time.time()
 while running and not playing:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-    if not(banners_collected == 3):
+    if not(banners_collected >= 3):
         if (time.time()-endStart) > 7:
             running = False
         scale = max(0,1-((time.time()-endStart)/5))
@@ -630,6 +634,16 @@ while running and not playing:
             Image.RED.set_alpha(32)
             screen.blit(Image.RED, (WIDTH/2-Image.RED.get_width()/2, HEIGHT/2-Image.RED.get_height()/2))
         _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (random.randint(-15,15),random.randint(-15,15)))
+    else:
+        if (time.time()-endStart) > 15:
+            running = False
+        f = min(max(0, (15-(time.time()-endStart))), 1)
+        t = time.time()*3
+        screen.fill((int((-math.sin(t)+1)*255/2*f), int((math.sin(t)+1)*255/2*f), int((math.cos(t)+1)*255/2*f)))
+        Image.ENDSCREEN_PLAYER.set_alpha(200*f)
+        screen.blit(Image.ENDSCREEN_PLAYER, (0,0))
+        t = abs(round(math.sin(time.time()*3)*15))+1
+        _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (random.randint(-t,t),random.randint(-t,t)))
     pygame.display.flip()
     clock.tick(30)
 
