@@ -1,7 +1,5 @@
 from math import sqrt
-import pygame, random, heapq, sys, time, math, array, asyncio
-
-random.seed(time.time_ns())
+import pygame, random, heapq, sys, time, math, array, asyncio, os
 
 # Grid and Screen Dimensions
 WIDTH = 900
@@ -464,6 +462,8 @@ class Boss:
         return path
 
 async def main():
+    random.seed(os.urandom(16))
+
     # Initialize Pygame
     pygame.init()
     pygame.mixer.init()
