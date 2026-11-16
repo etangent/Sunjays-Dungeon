@@ -37,11 +37,11 @@ class Image:
 
 class Sound:
     PATH = "./assets/sounds/"
-    P_PANT = ["breathing{}.wav".format(x) for x in range(2,4+1)]
+    P_PANT = ["breathing{}.ogg".format(x) for x in range(2,4+1)]
     PANTS = []
-    P_BEAT = ["beat.wav"]
+    P_BEAT = ["beat.ogg"]
     BEATS = []
-    P_STEP = ["walk{}.wav".format(x) for x in range(2,7+1)]
+    P_STEP = ["walk{}.ogg".format(x) for x in range(2,7+1)]
     STEPS = []
 
     @classmethod
@@ -49,10 +49,10 @@ class Sound:
         cls.PANTS = [pygame.mixer.Sound(cls.PATH+x) for x in cls.P_PANT]
         cls.BEATS = [pygame.mixer.Sound(cls.PATH+x) for x in cls.P_BEAT]
         cls.STEPS = [pygame.mixer.Sound(cls.PATH+x) for x in cls.P_STEP]
-        cls.SCARE = pygame.mixer.Sound(cls.PATH + "scare.wav")
-        cls.SCREAM = pygame.mixer.Sound(cls.PATH + "shrek screams.wav")
-        cls.WIN = pygame.mixer.Sound(cls.PATH + "outro.wav")
-        cls.LAUGH = pygame.mixer.Sound(cls.PATH + "laugh.wav")
+        cls.SCARE = pygame.mixer.Sound(cls.PATH + "scare.ogg")
+        cls.SCREAM = pygame.mixer.Sound(cls.PATH + "shrek-screams.ogg")
+        cls.WIN = pygame.mixer.Sound(cls.PATH + "outro.ogg")
+        cls.LAUGH = pygame.mixer.Sound(cls.PATH + "laugh.ogg")
         cls.PRIORITY_CHANNEL = pygame.mixer.Channel(0)
 
     @staticmethod
