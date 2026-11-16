@@ -628,6 +628,7 @@ async def main():
     else:
         Sound.PRIORITY_CHANNEL.play(Sound.WIN)
     endStart = time.time()
+    lastBeat = endStart
     while running and not playing:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -637,12 +638,13 @@ async def main():
                 running = False
             scale = max(0,1-((time.time()-endStart)/5))
             screen.fill((0,0,0))
-            if random.random() < 0.5*scale:
+            if random.random() < 0.5*scale and time.time() - lastBeat > 0.5:
                 Image.ENDSCREEN_BOSS.set_alpha(255-int(255*scale))
                 screen.blit(Image.ENDSCREEN_BOSS, (0,0))
                 s = Sound.rollLimitless(Sound.P_BEAT)
                 s.set_volume(scale)
                 s.play()
+                lastBeat = time.time()
             if random.random() < 0.3*scale:
                 Image.RED.set_alpha(32)
                 screen.blit(Image.RED, (WIDTH/2-Image.RED.get_width()/2, HEIGHT/2-Image.RED.get_height()/2))
