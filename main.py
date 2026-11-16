@@ -35,6 +35,12 @@ class Image:
         cls.RED = pygame.image.load("./assets/red.png").convert_alpha()
         cls.RED = pygame.transform.scale(cls.RED, (WIDTH * 3, HEIGHT * 3))
 
+        cls.WIRE = pygame.image.load("./assets/wires.jpg").convert_alpha()
+        cls.WIRE = pygame.transform.scale(cls.WIRE, (CELL_SIZE - 8, CELL_SIZE - 8))
+
+        cls.KRAKEN = pygame.image.load("./assets/kraken.jpg").convert_alpha()
+        cls.KRAKEN = pygame.transform.scale(cls.KRAKEN, (CELL_SIZE - 8, CELL_SIZE - 8))
+
 class Sound:
     PATH = "./assets/sounds/"
     P_PANT = ["breathing{}.ogg".format(x) for x in range(2,4+1)]
@@ -154,6 +160,17 @@ def generate_maze(size, loop_density):
                     v_open = (maze[r-1][c].terrain_type == "path" and maze[r+1][c].terrain_type == "path")
                     if h_open or v_open:
                         maze[r][c].terrain_type = "path"
+
+    for r in range(1, size - 1):
+        for c in range(1, size - 1):
+            if maze[r][c].terrain_type == "path":
+                if random.random() < .016:
+                    maze[r][c].item = "wires"
+                elif random.random() < .03:
+                    maze[r][c].item = "kraken"
+                elif random.random() < .01:
+                    maze[r][c].item = "fake"
+
     return maze
 
 class Cell:
@@ -161,6 +178,7 @@ class Cell:
         self.x = x
         self.y = y
         self.terrain_type = terrain_type
+        self.item = "none"
 
 class BlueBanner:
     def __init__(self, maze, occupied_positions):
@@ -182,9 +200,8 @@ class BlueBanner:
 
 class Player:
     LIGHT_LEVEL = 4
-    def __init__(self, start_pos, move_cooldown, color, last_trip = 0):
+    def __init__(self, start_pos, color, last_trip = 0):
         self.pos = list(start_pos)
-        self.move_cooldown = move_cooldown
         self.color = color
         self.light_level = Player.LIGHT_LEVEL
         self.last_trip = last_trip
@@ -448,7 +465,7 @@ async def main():
 
     maze = generate_maze(GRID_SIZE, .25)
 
-    player = Player(start_pos=[GRID_SIZE - 4, GRID_SIZE - 4], move_cooldown=150, color=(52, 152, 219))
+    player = Player(start_pos=[GRID_SIZE - 4, GRID_SIZE - 4], color=(52, 152, 219))
     maze[player.pos[1]][player.pos[0]].terrain_type = "path"
 
     ghosts = [
@@ -479,6 +496,7 @@ async def main():
     running = True
     playing = True
     last_player_move = "up"
+    last_blind = 0
     while running and playing:
         current_time = pygame.time.get_ticks()
 
@@ -543,6 +561,23 @@ async def main():
 
                 last_player_move_time = current_time
 
+                if maze[new_py][new_px].item == "kraken":
+                    PLAYER_COOLDOWN *= .9
+                    maze[new_py][new_px].item = "none"
+                elif maze[new_py][new_px].item == "wires":
+                    PLAYER_COOLDOWN *= 1.5
+                    maze[new_py][new_px].item = "none"
+                elif maze[new_py][new_px].item == "fake":
+                    player.LIGHT_LEVEL = 2
+                    player.light_level = 2
+                    print("tests")
+                    last_blind = pygame.time.get_ticks()
+                    maze[new_py][new_px].item = "none"
+
+        if (pygame.time.get_ticks() - last_blind) > 5000:
+            player.LIGHT_LEVEL = 4
+            player.light_level = 4
+
         if trip_chance > .1 and random.random() < trip_chance:
             player.last_trip = current_time
             avg_move_time = (0, 0)
@@ -584,6 +619,15 @@ async def main():
                                 Color.BG[1] * (1 - light) + Color.WALL[1] * light, 
                                 Color.BG[2] * (1 - light) + Color.WALL[2] * light)
                     pygame.draw.rect(screen, [x*lightBounce for x in color], rect)
+                elif maze[row][col].item != "none":
+                    b_rect = pygame.Rect(pos[0] + 4, pos[1] + 4, CELL_SIZE - 8, CELL_SIZE - 8)
+                    item_dict = {"wires": Image.WIRE, "kraken": Image.KRAKEN, "fake": Image.BLUEBANNER}
+                    if not debug:
+                        item_dict[maze[row][col].item].set_alpha(player.light_value((col, row)) * 255)
+                    else:
+                        item_dict[maze[row][col].item].set_alpha(255)
+                    screen.blit(item_dict[maze[row][col].item], b_rect)
+                    
     
         for ghost in ghosts:
             if not debug:
