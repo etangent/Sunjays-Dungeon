@@ -230,11 +230,19 @@ class Ghost:
                 self.state = "chase"
         elif self.state == "chase":
             if self.heuristic(player_pos, tuple(self.pos)) >= 10:
-                self.state = "patrol"
+                self.state = "frustration"
                 self.path = []
+        elif self.state == "frustration":
+            if self.heuristic(player_pos, tuple(self.pos)) >= 15:
+                self.state = "patrol"
+            elif self.heuristic(player_pos, tuple(self.pos)) <= 6:
+                self.state = "chase"
 
         if self.state == "chase":
             self.move(pygame.time.get_ticks(), maze, player_pos)
+        elif self.state == "frustration":
+            # sit there frustrated and make a wire as revenge
+            maze[self.pos[1]][self.pos[0]].item = "wires"
         else:
             if pygame.time.get_ticks() - self.last_move_time > self.move_cooldown:
                 neighbours = [(self.pos[0] + dx, self.pos[1] + dy) for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)] if 0 <= self.pos[0] + dx < GRID_SIZE and 0 <= self.pos[1] + dy < GRID_SIZE and maze[self.pos[1] + dy][self.pos[0] + dx].terrain_type == "path"]
@@ -371,14 +379,14 @@ class Boss:
             if filtered:
                 next_move = random.choices([i for i in range(4)], weights=[f[0] for f in filtered])[0]
                 target = filtered[next_move][1]
-        self.move(current_time, maze, target)
+        self.move(current_time, maze, target, player_pos)
 
-    def update_path(self, maze, target_pos):
-        self.path = self.get_astar_path(maze, tuple(self.pos), tuple(target_pos))
+    def update_path(self, maze, target_pos, player_pos):
+        self.path = self.get_astar_path(maze, tuple(self.pos), tuple(target_pos), tuple(player_pos))
 
-    def move(self, current_time, maze, player_pos):
+    def move(self, current_time, maze, target, player_pos):
         if current_time - self.last_move_time > self.move_cooldown:
-            self.update_path(maze, player_pos)
+            self.update_path(maze, target, player_pos)
             if len(self.path) > 1:
                 if tuple(self.pos) in self.path:
                     idx = self.path.index(tuple(self.pos))
@@ -387,7 +395,7 @@ class Boss:
                 else:
                     self.pos = list(self.path[0])
 
-            self.update_path(maze, player_pos)
+            self.update_path(maze, target, player_pos)
             self.last_move_time = current_time
             if self.heuristic(tuple(player_pos), tuple(self.pos)) == 0:
                 return
@@ -413,7 +421,7 @@ class Boss:
     def heuristic(self, a, b):
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
-    def get_astar_path(self, maze, start, target):
+    def get_astar_path(self, maze, start, target, player_pos):
         if start == target:
             return [start]
     
@@ -433,6 +441,9 @@ class Boss:
                 nx, ny = next_node
                 if 0 <= nx < GRID_SIZE and 0 <= ny < GRID_SIZE and maze[ny][nx].terrain_type == "path":
                     new_cost = cost_so_far[current] + 1
+                    # incentivize ambushing and not going through the player
+                    if player_pos[0] == nx and player_pos[1] == ny:
+                        new_cost += 100
                     if next_node not in cost_so_far or new_cost < cost_so_far[next_node]:
                         cost_so_far[next_node] = new_cost
                         priority = new_cost + self.heuristic(target, next_node)
@@ -568,9 +579,8 @@ async def main():
                     PLAYER_COOLDOWN *= 1.5
                     maze[new_py][new_px].item = "none"
                 elif maze[new_py][new_px].item == "fake":
-                    player.LIGHT_LEVEL = 2
-                    player.light_level = 2
-                    print("tests")
+                    player.LIGHT_LEVEL = 1
+                    player.light_level = 1
                     last_blind = pygame.time.get_ticks()
                     maze[new_py][new_px].item = "none"
 
