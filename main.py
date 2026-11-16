@@ -659,6 +659,7 @@ async def main():
             _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (random.randint(-t,t),random.randint(-t,t)))
         pygame.display.flip()
         clock.tick(30)
+        await asyncio.sleep(0)
 
     pygame.quit()
     sys.exit()
