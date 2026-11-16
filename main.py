@@ -1,6 +1,8 @@
 from math import sqrt
 import pygame, random, heapq, sys, time, math, array, asyncio
 
+random.seed(time.time_ns())
+
 # Grid and Screen Dimensions
 WIDTH = 900
 HEIGHT = WIDTH
