@@ -619,7 +619,7 @@ async def main():
         _screen.blit(pygame.transform.scale(screen, _screen.get_size()), (s(), s()))
         pygame.display.flip()
         clock.tick(30)
-        asyncio.sleep(0)
+        await asyncio.sleep(0)
 
     # endscreen
     Sound.PRIORITY_CHANNEL.stop()
