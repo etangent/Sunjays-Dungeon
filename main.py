@@ -4,7 +4,7 @@ import pygame, random, heapq, sys, time, math, array, asyncio, os
 # Grid and Screen Dimensions
 WIDTH = 900
 HEIGHT = WIDTH
-SCALE = 1
+SCALE = 0.7
 GRID_SIZE = 30
 CELL_SIZE = WIDTH // GRID_SIZE
 
@@ -538,7 +538,7 @@ async def main():
 
         pulse = (math.sin(time.time()*2*math.pi*bpm/60)+1) / 2
         dist_to_player = math.dist(boss.pos, player.pos)
-        amplitude = ((GRID_SIZE - dist_to_player) / GRID_SIZE) * .5
+        amplitude = ((GRID_SIZE - dist_to_player) / GRID_SIZE) * 0.75
         redAlpha = int(max(0, min(200, (bpm-100)*amplitude))*(0.5+0.5*pulse))
 
         trip_chance = 0
@@ -684,7 +684,6 @@ async def main():
     else:
         Sound.PRIORITY_CHANNEL.play(Sound.WIN)
     endStart = time.time()
-    lastBeat = endStart
     while running and not playing:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -694,13 +693,12 @@ async def main():
                 running = False
             scale = max(0,1-((time.time()-endStart)/5))
             screen.fill((0,0,0))
-            if random.random() < 0.5*scale and time.time() - lastBeat > 0.5:
+            if random.random() < 0.5*scale:
                 Image.ENDSCREEN_BOSS.set_alpha(255-int(255*scale))
                 screen.blit(Image.ENDSCREEN_BOSS, (0,0))
                 s = Sound.rollLimitless(Sound.P_BEAT)
                 s.set_volume(scale)
                 s.play()
-                lastBeat = time.time()
             if random.random() < 0.3*scale:
                 Image.RED.set_alpha(32)
                 screen.blit(Image.RED, (WIDTH/2-Image.RED.get_width()/2, HEIGHT/2-Image.RED.get_height()/2))
