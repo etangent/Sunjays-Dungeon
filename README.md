@@ -8,7 +8,7 @@ Stuck in purgatory, with random wires and parts laying around, you find yourself
 
 ---
 
-Credits:
+### Credits:
 
 - Programming:
     - [Ethan](https://github.com/etangent)
