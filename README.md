@@ -15,7 +15,7 @@ Stuck in purgatory, with random wires and parts laying around, you find yourself
     - [Ennio](https://github.com/Dwabingcats)
     - [Henry](https://github.com/HenryLi-0)
 - Imagery:
-    - [Stepahnie](https://github.com/stephaniezhhu) (original [modified Sunjay](</assets/boss.jpg>))
+    - [Stephanie](https://github.com/stephaniezhhu) (original [modified Sunjay](</assets/boss.jpg>))
     - [Ethan](https://github.com/etangent)
     - [Ennio](https://github.com/Dwabingcats)
 - Audio:
